@@ -24,6 +24,8 @@
     .flex > *{flex:1}
     .small{font-size:13px}
     footer{margin-top:18px;font-size:12px;color:#556}
+    footer h2 {font-size:14px;margin-top:12px}
+    footer p {margin:4px 0}
   </style>
   <!-- html2pdf bundle for client-side PDF export -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>
@@ -86,6 +88,43 @@
 
     <footer>
       <p>Privatsphäre &amp; Haftung: Diese Seite speichert keine Daten auf Servern. Alle Berechnungen laufen lokal in deinem Browser. Für eine produktive Anwendung (z. B. Rechnungen speichern / E-Mail Versand) sind sichere Server, Verschlüsselung und DSGVO-konforme Datenschutzerklärungen nötig.</p>
+
+      <h2>Impressum</h2>
+      <p><strong>Angaben gemäß § 5 TMG</strong></p>
+      <p>Linus Jung<br>
+      Kleimanns Weg 7<br>
+      59394 Nordkirchen<br>
+      E-Mail: linus.jung08@gmail.com</p>
+      <p><strong>Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV:</strong><br>
+      Linus Jung<br>
+      Kleimanns Weg 7<br>
+      59394 Nordkirchen</p>
+
+      <h2>Datenschutzerklärung</h2>
+      <p><strong>1. Verantwortlicher</strong><br>
+      Linus Jung<br>
+      E-Mail: linus.jung08@gmail.com</p>
+
+      <p><strong>2. Erhebung und Speicherung personenbezogener Daten</strong><br>
+      Beim Besuch dieser Website werden automatisch technische Informationen erfasst (z. B. Browsertyp, Betriebssystem, Uhrzeit des Seitenaufrufs). Diese Daten dienen ausschließlich der sicheren Bereitstellung und statistischen Auswertung.</p>
+
+      <p><strong>3. Cookies und Tracking (Google Analytics)</strong><br>
+      Diese Website verwendet Google Analytics, einen Webanalysedienst der Google Ireland Limited. Die IP-Adresse wird anonymisiert (\"IP-Anonymisierung\"), sodass keine direkte Zuordnung zu einer Person möglich ist. Sie können die Speicherung von Cookies verhindern oder ein Browser-Add-on nutzen: <a href="https://tools.google.com/dlpage/gaoptout?hl=de" target="_blank">Opt-Out-Link</a>.</p>
+
+      <p><strong>4. Google Ads</strong><br>
+      Diese Website verwendet Google Ads. Google Ads kann Cookies setzen, um die Effektivität von Werbung zu messen oder personalisierte Werbung anzuzeigen. Weitere Informationen: <a href="https://policies.google.com/technologies/ads?hl=de" target="_blank">Google Ads Info</a>.</p>
+
+      <p><strong>5. Rechtsgrundlage</strong><br>
+      Rechtsgrundlage ist Ihre Einwilligung gemäß Art. 6 Abs. 1 lit. a DSGVO. Diese kann jederzeit widerrufen werden.</p>
+
+      <p><strong>6. Ihre Rechte</strong><br>
+      Sie haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit. Zur Ausübung genügt eine Mitteilung an: linus.jung08@gmail.com</p>
+
+      <p><strong>7. Löschung von Daten</strong><br>
+      Personenbezogene Daten werden gelöscht, sobald der Zweck entfällt oder Sie Ihre Einwilligung widerrufen, sofern keine gesetzlichen Aufbewahrungspflichten bestehen.</p>
+
+      <p><strong>8. Aufsichtsbehörde</strong><br>
+      Sie haben das Recht, sich bei einer Datenschutzaufsichtsbehörde zu beschweren.</p>
     </footer>
   </div>
 
@@ -144,23 +183,34 @@
       grandTotalEl.textContent = fmt(subtotal + taxTotal);
     }
 
-    // PDF export using html2pdf
+    // PDF export using html2pdf (fixed)
     document.getElementById('download-pdf').addEventListener('click', () => {
-      // build a printable clone with simplified styling
-      const el = document.getElementById('invoice-app');
+      const original = document.getElementById('invoice-app');
+      const clone = original.cloneNode(true);
+
+      // Buttons entfernen
+      clone.querySelectorAll('button').forEach(btn => btn.remove());
+
+      // Eingabefelder in Text umwandeln
+      clone.querySelectorAll('input').forEach(inp => {
+        const span = document.createElement('span');
+        span.textContent = inp.value;
+        inp.parentNode.replaceChild(span, inp);
+      });
+
       const opt = {
         margin:       0.4,
-        filename:     (document.getElementById('inv-no').value || 'invoice') + '.pdf',
+        filename:     (document.getElementById('inv-no').value || 'rechnung') + '.pdf',
         image:        { type: 'jpeg', quality: 0.98 },
         html2canvas:  { scale: 2, useCORS: true },
         jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
       };
-      html2pdf().set(opt).from(el).save();
+
+      html2pdf().set(opt).from(clone).save();
     });
 
     // initialize
     (function(){
-      // set today's date
       const d = new Date();
       document.getElementById('date').value = d.toISOString().slice(0,10);
       addDefaultRows();
@@ -169,3 +219,4 @@
   </script>
 </body>
 </html>
+
