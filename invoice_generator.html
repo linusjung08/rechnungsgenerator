@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Rechnungsgenerator (kostenlos)</title>
+  <meta name="description" content="Ein einfacher, frei nutzbarer Rechnungsgenerator mit Mehrwertsteuer-Berechnung und PDF-Export." />
+  <style>
+    :root{font-family:Inter,system-ui,Segoe UI,Roboto,'Helvetica Neue',Arial;--accent:#0b74de}
+    body{margin:0;padding:24px;background:#f7f9fc;color:#111}
+    .container{max-width:980px;margin:0 auto;background:white;padding:20px;border-radius:10px;box-shadow:0 6px 18px rgba(15,23,42,.06)}
+    h1{margin:0 0 12px;font-size:20px}
+    label{display:block;font-size:13px;margin-bottom:6px}
+    input[type=text], input[type=number], select{width:100%;padding:8px;border-radius:6px;border:1px solid #e6eef8;margin-bottom:12px}
+    table{width:100%;border-collapse:collapse;margin-top:6px}
+    th,td{padding:8px;border-bottom:1px solid #eef4fb;text-align:left}
+    .row-actions{display:flex;gap:8px}
+    button{background:var(--accent);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid #dbeefc}
+    .muted{font-size:13px;color:#556}
+    .totals{margin-top:12px;text-align:right}
+    .totals div{margin:6px 0}
+    .flex{display:flex;gap:12px}
+    .flex > *{flex:1}
+    .small{font-size:13px}
+    footer{margin-top:18px;font-size:12px;color:#556}
+  </style>
+  <!-- html2pdf bundle for client-side PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>
+</head>
+<body>
+  <div class="container" id="invoice-app">
+    <h1>Rechnungsgenerator (kostenlos)</h1>
+    <p class="muted">Fülle die Felder aus, füge Positionen hinzu, berechne Steuern und exportiere als PDF. Diese Seite stellt keine steuerliche Beratung dar — prüfe Zahlen vor dem Versand.</p>
+
+    <section>
+      <div class="flex">
+        <div>
+          <label>Rechnung von (Ihr Name / Firma)</label>
+          <input id="from" type="text" placeholder="Max Mustermann GmbH" value="Max Mustermann" />
+        </div>
+        <div>
+          <label>Rechnung an (Kunde)</label>
+          <input id="to" type="text" placeholder="Kundenname / Firma" value="Kunde AG" />
+        </div>
+      </div>
+
+      <div class="flex">
+        <div>
+          <label>Rechnungsnummer</label>
+          <input id="inv-no" type="text" placeholder="2025-0001" value="2025-0001" />
+        </div>
+        <div>
+          <label>Datum</label>
+          <input id="date" type="date" />
+        </div>
+      </div>
+    </section>
+
+    <section style="margin-top:12px">
+      <table id="items-table">
+        <thead>
+          <tr><th>Beschreibung</th><th style="width:110px">Menge</th><th style="width:140px">Preis (netto)</th><th style="width:110px">MwSt %</th><th style="width:80px">Summe</th><th style="width:80px"></th></tr>
+        </thead>
+        <tbody id="items-body">
+          <!-- rows go here -->
+        </tbody>
+      </table>
+      <div style="margin-top:8px;display:flex;justify-content:space-between;align-items:center">
+        <button id="add-row">+ Position hinzufügen</button>
+        <div class="small muted">Hinweis: MwSt-Berechnung erfolgt automatisch pro Zeile.</div>
+      </div>
+
+      <div class="totals">
+        <div>Zwischensumme (netto): <strong id="subtotal">0.00 €</strong></div>
+        <div>Gesamt MwSt: <strong id="tax-total">0.00 €</strong></div>
+        <div style="font-size:18px">Gesamt (brutto): <strong id="grand-total">0.00 €</strong></div>
+      </div>
+
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button id="download-pdf">Als PDF speichern</button>
+        <button class="ghost" id="print">Drucken</button>
+        <button class="ghost" id="reset">Zurücksetzen</button>
+      </div>
+    </section>
+
+    <footer>
+      <p>Privatsphäre &amp; Haftung: Diese Seite speichert keine Daten auf Servern. Alle Berechnungen laufen lokal in deinem Browser. Für eine produktive Anwendung (z. B. Rechnungen speichern / E-Mail Versand) sind sichere Server, Verschlüsselung und DSGVO-konforme Datenschutzerklärungen nötig.</p>
+    </footer>
+  </div>
+
+  <script>
+    // Utilities
+    const fmt = n => Number(n).toLocaleString('de-DE', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' €';
+    const parse = v => Number(String(v).replace(',', '.')) || 0;
+
+    // Dynamic rows
+    const itemsBody = document.getElementById('items-body');
+    const subtotalEl = document.getElementById('subtotal');
+    const taxTotalEl = document.getElementById('tax-total');
+    const grandTotalEl = document.getElementById('grand-total');
+
+    function makeRow(desc = '', qty = 1, price = 0, tax = 19) {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><input class="desc" type="text" value="${desc}" placeholder="Leistung / Produkt"></td>
+        <td><input class="qty" type="number" min="0" step="1" value="${qty}"></td>
+        <td><input class="price" type="number" min="0" step="0.01" value="${price}"></td>
+        <td><input class="tax" type="number" min="0" step="0.01" value="${tax}"></td>
+        <td class="line-sum">0.00 €</td>
+        <td><div class="row-actions"><button class="del ghost">✕</button></div></td>
+      `;
+
+      // events
+      tr.querySelectorAll('input').forEach(inp => inp.addEventListener('input', recalc));
+      tr.querySelector('.del').addEventListener('click', () => { tr.remove(); recalc(); });
+      return tr;
+    }
+
+    document.getElementById('add-row').addEventListener('click', () => { itemsBody.appendChild(makeRow()); recalc(); });
+    document.getElementById('reset').addEventListener('click', () => { itemsBody.innerHTML=''; addDefaultRows(); recalc(); });
+    document.getElementById('print').addEventListener('click', () => window.print());
+
+    function addDefaultRows(){
+      itemsBody.appendChild(makeRow('Beratung',1,120,19));
+      itemsBody.appendChild(makeRow('Design',2,75,19));
+    }
+
+    function recalc(){
+      let subtotal = 0, taxTotal = 0;
+      Array.from(itemsBody.querySelectorAll('tr')).forEach(tr => {
+        const qty = parse(tr.querySelector('.qty').value);
+        const price = parse(tr.querySelector('.price').value);
+        const tax = parse(tr.querySelector('.tax').value);
+        const lineNet = qty * price;
+        const lineTax = lineNet * (tax/100);
+        const lineSum = lineNet + lineTax;
+        tr.querySelector('.line-sum').textContent = fmt(lineSum);
+        subtotal += lineNet;
+        taxTotal += lineTax;
+      });
+      subtotalEl.textContent = fmt(subtotal);
+      taxTotalEl.textContent = fmt(taxTotal);
+      grandTotalEl.textContent = fmt(subtotal + taxTotal);
+    }
+
+    // PDF export using html2pdf
+    document.getElementById('download-pdf').addEventListener('click', () => {
+      // build a printable clone with simplified styling
+      const el = document.getElementById('invoice-app');
+      const opt = {
+        margin:       0.4,
+        filename:     (document.getElementById('inv-no').value || 'invoice') + '.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+      };
+      html2pdf().set(opt).from(el).save();
+    });
+
+    // initialize
+    (function(){
+      // set today's date
+      const d = new Date();
+      document.getElementById('date').value = d.toISOString().slice(0,10);
+      addDefaultRows();
+      recalc();
+    })();
+  </script>
+</body>
+</html>
